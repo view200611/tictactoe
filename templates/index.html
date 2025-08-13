@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tic Tac Toe with Leaderboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <button id="theme-toggle">Switch to Dark Mode</button>
+
+    <h1>Tic Tac Toe - AI</h1>
+
+    <!-- Auth Section -->
+    <div id="auth">
+        <h2>Login / Register</h2>
+        <input type="text" id="authUsername" placeholder="Username">
+        <input type="password" id="authPassword" placeholder="Password">
+        <br>
+        <button onclick="registerUser()">Register</button>
+        <button onclick="loginUser()">Login</button>
+        <p id="authMsg"></p>
+    </div>
+
+    <!-- Game Section -->
+    <div id="gameSection" style="display:none;">
+        <div id="game">
+            <div id="board"></div>
+            <div id="status">Your turn!</div>
+            <button  onclick="newGame()">New Game</button>
+        </div>
+
+        <h2>Leaderboard</h2>
+        <table id="leaderboard">
+            <thead>
+                <tr><th>User</th><th>Wins</th><th>Losses</th><th>Draws</th></tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <script>
+        const toggleBtn = document.getElementById("theme-toggle");
+
+// Load saved theme from localStorage
+if (localStorage.getItem("theme") === "dark") {
+    document.body.classList.add("dark-mode");
+    toggleBtn.textContent = "Switch to Light Mode";
+} else {
+    document.body.classList.add("light-mode");
+}
+
+// Toggle theme on button click
+toggleBtn.addEventListener("click", () => {
+    if (document.body.classList.contains("light-mode")) {
+        document.body.classList.replace("light-mode", "dark-mode");
+        toggleBtn.textContent = "Switch to Light Mode";
+        localStorage.setItem("theme", "dark");
+    } else {
+        document.body.classList.replace("dark-mode", "light-mode");
+        toggleBtn.textContent = "Switch to Dark Mode";
+        localStorage.setItem("theme", "light");
+    }
+});
+
+    let username = "";
+    let board = ["", "", "", "", "", "", "", "", ""];
+    let player = "X";
+    const apiUrl = "http://127.0.0.1:5000";
+
+    async function registerUser() {
+        const u = document.getElementById("authUsername").value.trim();
+        const p = document.getElementById("authPassword").value;
+        const res = await fetch(apiUrl + "/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: u, password: p })
+        });
+        const data = await res.json();
+        document.getElementById("authMsg").textContent = data.message || data.error;
+    }
+
+    async function loginUser() {
+        username = document.getElementById("authUsername").value.trim();
+        const p = document.getElementById("authPassword").value;
+        const res = await fetch(apiUrl + "/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password: p })
+        });
+        const data = await res.json();
+        if (data.message) {
+            document.getElementById("auth").style.display = "none";
+            document.getElementById("gameSection").style.display = "block";
+            newGame();
+            loadLeaderboard();
+        }
+        document.getElementById("authMsg").textContent = data.message || data.error;
+    }
+
+    function renderBoard() {
+        const boardDiv = document.getElementById("board");
+        boardDiv.innerHTML = "";
+        board.forEach((cell, idx) => {
+            const div = document.createElement("div");
+            div.classList.add("cell");
+            if (cell !== "") div.classList.add("taken");
+            div.textContent = cell;
+            div.onclick = () => makeMove(idx);
+            boardDiv.appendChild(div);
+        });
+    }
+
+    async function makeMove(index) {
+        if (board[index] !== "") return;
+        board[index] = player;
+        const res = await fetch(apiUrl + "/move", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, board, player })
+        });
+        const data = await res.json();
+        board = data.board;
+        renderBoard();
+        if (data.winner) {
+            alert(data.winner === "draw" ? "It's a draw!" : `${data.winner} wins!`);
+        }
+        loadLeaderboard();
+    }
+
+    function newGame() {
+        board = ["", "", "", "", "", "", "", "", ""];
+        renderBoard();
+    }
+
+    async function loadLeaderboard() {
+        const res = await fetch(apiUrl + "/leaderboard");
+        const data = await res.json();
+        const tbody = document.querySelector("#leaderboard tbody");
+        tbody.innerHTML = "";
+        data.forEach(row => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `<td>${row.username}</td><td>${row.wins}</td><td>${row.losses}</td><td>${row.draws}</td>`;
+            tbody.appendChild(tr);
+        });
+    }
+    </script>
+</body>
+</html>
